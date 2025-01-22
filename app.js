@@ -6,7 +6,7 @@ import authRoutes from './routes/authRoutes.js'
 import swaggerUi from 'swagger-ui-express'
 import swaggerJsDoc from 'swagger-jsdoc'
 import dotenv from 'dotenv'
-import { swaggerOptions } from './docs/swaggerconfig.js'
+import { swaggerOptions } from './docs/swaggerConfig.js'
 
 dotenv.config()
 const app = express()
