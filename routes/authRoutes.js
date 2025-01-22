@@ -1,7 +1,7 @@
-import express from 'express';
-import { register, login } from '../controllers/authController.js';
+import express from 'express'
+import { register, login } from '../controllers/authController.js'
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
@@ -35,7 +35,7 @@ const router = express.Router();
  *       400:
  *         description: User already exists or invalid data
  */
-router.post('/register', register);
+router.post('/register', register)
 
 /**
  * @swagger
@@ -60,6 +60,6 @@ router.post('/register', register);
  *       400:
  *         description: Invalid email or password
  */
-router.post('/login', login);
+router.post('/login', login)
 
-export default router;
+export default router

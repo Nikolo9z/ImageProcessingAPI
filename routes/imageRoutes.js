@@ -1,14 +1,14 @@
-import express from 'express';
-import { uploadImage, upload, getAllImages, getImageId, deleteImage, resizeImage, rotateImage, flipImage, changeFormatImage } from '../controllers/imageController.js';
-import { protect } from '../middlewares/authMiddleware.js';
+import express from 'express'
+import { uploadImage, upload, getAllImages, getImageId, deleteImage, resizeImage, rotateImage, flipImage, changeFormatImage } from '../controllers/imageController.js'
+import { protect } from '../middlewares/authMiddleware.js'
 
-const router = express.Router();
+const router = express.Router()
 
 /**
  * @swagger
  * tags:
  *   name: Images
- *   description: Image processing routes, 
+ *   description: Image processing routes,
  */
 
 /**
@@ -35,7 +35,7 @@ const router = express.Router();
  *       400:
  *         description: Invalid image format
  */
-router.post('/upload', protect, upload.single('image'), uploadImage);
+router.post('/upload', protect, upload.single('image'), uploadImage)
 
 /**
  * @swagger
@@ -57,7 +57,7 @@ router.post('/upload', protect, upload.single('image'), uploadImage);
  *       500:
  *         description: Error retrieving images
  */
-router.get('/', protect, getAllImages);
+router.get('/', protect, getAllImages)
 
 /**
  * @swagger
@@ -84,7 +84,7 @@ router.get('/', protect, getAllImages);
  *       404:
  *         description: Image not found
  */
-router.get('/:id', protect, getImageId);
+router.get('/:id', protect, getImageId)
 
 /**
  * @swagger
@@ -107,7 +107,7 @@ router.get('/:id', protect, getImageId);
  *       404:
  *         description: Image not found
  */
-router.delete('/:id', protect, deleteImage);
+router.delete('/:id', protect, deleteImage)
 
 /**
  * @swagger
@@ -142,7 +142,7 @@ router.delete('/:id', protect, deleteImage);
  *       404:
  *         description: Image not found
  */
-router.get('/resize/:id', protect, resizeImage);
+router.get('/resize/:id', protect, resizeImage)
 
 /**
  * @swagger
@@ -171,7 +171,7 @@ router.get('/resize/:id', protect, resizeImage);
  *       404:
  *         description: Image not found
  */
-router.get('/rotate/:id', protect, rotateImage);
+router.get('/rotate/:id', protect, rotateImage)
 
 /**
  * @swagger
@@ -200,7 +200,7 @@ router.get('/rotate/:id', protect, rotateImage);
  *       404:
  *         description: Image not found
  */
-router.get('/flip/:id', protect, flipImage);
+router.get('/flip/:id', protect, flipImage)
 
 /**
  * @swagger
@@ -229,6 +229,6 @@ router.get('/flip/:id', protect, flipImage);
  *       404:
  *         description: Image not found
  */
-router.get('/change/:id', protect, changeFormatImage);
+router.get('/change/:id', protect, changeFormatImage)
 
-export default router;
+export default router
