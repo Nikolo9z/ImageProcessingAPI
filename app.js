@@ -7,9 +7,15 @@ import swaggerUi from 'swagger-ui-express'
 import swaggerJsDoc from 'swagger-jsdoc'
 import dotenv from 'dotenv'
 import { swaggerOptions } from './docs/swaggerConfig.js'
+import cors from 'cors'
 
 dotenv.config()
 const app = express()
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN,
+  optionsSuccessStatus: 200
+}
+app.use(cors(corsOptions))
 
 app.use(limiter)
 app.disable('x-powered-by')
