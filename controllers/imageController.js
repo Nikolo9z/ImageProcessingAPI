@@ -1,9 +1,9 @@
-import path from 'path'
 import multer from 'multer'
 import sharp from 'sharp'
 import Image from '../models/imageModel.js'
 import { s3 } from '../s3.js'
 import dotenv from 'dotenv'
+import { apiResponse } from '../utils/response.js'
 dotenv.config()
 
 const multerStorage = multer.memoryStorage()
@@ -11,16 +11,45 @@ export const upload = multer({ storage: multerStorage })
 
 export const uploadImage = async (req, res) => {
   try {
+    if (!req.user) {
+      return apiResponse(
+        res,
+        false,
+        'Usuario no autenticado',
+        null,
+        'Token inválido o expirado',
+        401
+      )
+    }
+
     const { buffer } = req.file
     const metadata = await sharp(buffer).metadata()
+
+    if (!metadata.format) {
+      return apiResponse(
+        res,
+        false,
+        'Formato de imagen no reconocido',
+        null,
+        'Formato inválido',
+        400
+      )
+    }
+
+    const resizedBuffer = await sharp(buffer)
+      .resize({ width: 1200 })
+      .toBuffer()
+
     const filename = `${Date.now()}.${metadata.format}`
     const s3params = {
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: `images/${filename}`,
-      Body: buffer,
+      Body: resizedBuffer,
       ContentType: `image/${metadata.format}`
     }
+
     const uploadResult = await s3.upload(s3params).promise()
+
     const newImage = new Image({
       filename,
       urls3: uploadResult.Location,
@@ -29,173 +58,180 @@ export const uploadImage = async (req, res) => {
       height: metadata.height,
       user: req.user._id
     })
+
     await newImage.save()
-    res.status(201).json({ message: 'Image uploaded successfully', image: newImage })
+
+    return apiResponse(res, true, 'Imagen subida exitosamente', newImage)
   } catch (error) {
-    res.status(400).json({ error: error.message })
+    return apiResponse(
+      res,
+      false,
+      'Error al subir imagen',
+      null,
+      error.message,
+      400
+    )
   }
 }
 
-export const getAllImages = async (req, res) => {
+export const getAllMyImages = async (req, res) => {
   try {
+    if (!req.user) {
+      return apiResponse(
+        res,
+        false,
+        'Usuario no autenticado',
+        null,
+        'Token inválido o expirado',
+        401
+      )
+    }
+
     const images = await Image.find({ user: req.user._id })
-    res.status(200).json(images)
+    if (images.length === 0) {
+      return apiResponse(res, true, 'No tienes imágenes subidas', [])
+    }
+
+    return apiResponse(res, true, 'Imágenes obtenidas correctamente', images)
   } catch (error) {
-    res.status(500).json({ error: 'user do not have images' })
+    return apiResponse(
+      res,
+      false,
+      'Error al obtener imágenes',
+      null,
+      error.message,
+      500
+    )
   }
 }
 
-export const getImageId = async (req, res) => {
+export const getImageById = async (req, res) => {
   try {
-    const image = await Image.findById({ _id: req.params.id, user: req.user._id })
-    res.status(200).json(image)
+    const image = await Image.findById(req.params.id).populate(
+      'user',
+      'username urlAvatar'
+    )
+
+    if (!image) {
+      return apiResponse(
+        res,
+        false,
+        'Imagen no encontrada',
+        null,
+        'No existe una imagen con ese ID',
+        404
+      )
+    }
+
+    const isOwner = req.user
+      ? String(image.user._id) === String(req.user._id)
+      : false
+
+    return apiResponse(res, true, 'Imagen obtenida correctamente', {
+      ...image.toObject(),
+      isOwner
+    })
   } catch (error) {
-    res.status(500).json({ error: 'image not found' })
+    return apiResponse(
+      res,
+      false,
+      'Error al obtener imagen',
+      null,
+      error.message,
+      500
+    )
   }
 }
 
 export const deleteImage = async (req, res) => {
   try {
-    const image = await Image.findByIdAndDelete({ _id: req.params.id, user: req.user._id })
+    const image = await Image.findById(req.params.id)
+
     if (!image) {
-      return res.status(404).json({ error: 'Image not found' })
+      return apiResponse(
+        res,
+        false,
+        'Imagen no encontrada',
+        null,
+        'No existe una imagen con ese ID',
+        404
+      )
     }
+    if (String(image.user) !== String(req.user._id)) {
+      return apiResponse(
+        res,
+        false,
+        'No tienes permiso para eliminar esta imagen',
+        null,
+        'Acceso denegado',
+        403
+      )
+    }
+    await Image.findByIdAndDelete(req.params.id)
     const s3params = {
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: `images/${image.filename}`
     }
     await s3.deleteObject(s3params).promise()
-    res.status(200).json({ message: 'Image deleted successfully' })
+
+    return apiResponse(res, true, 'Imagen eliminada correctamente')
   } catch (error) {
-    res.status(500).json({ error: error.message })
+    return apiResponse(
+      res,
+      false,
+      'Error al eliminar imagen',
+      null,
+      error.message,
+      500
+    )
   }
 }
 
-export const resizeImage = async (req, res) => {
+export const toggleLike = async (req, res) => {
   try {
-    const image = await Image.findById({ _id: req.params.id, user: req.user._id })
+    const imageId = req.params.id
+    const image = await Image.findById(imageId)
     if (!image) {
-      return res.status(404).json({ error: 'image not found' })
+      return apiResponse(
+        res,
+        false,
+        'Imagen no encontrada',
+        null,
+        'ID inválido',
+        404
+      )
     }
 
-    const { width, height } = req.query
-    const s3Params = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: `images/${image.filename}`
+    const userId = req.user._id
+    const alreadyLiked = image.likes.some(
+      (id) => id.toString() === userId.toString()
+    )
+
+    if (alreadyLiked) {
+      image.likes.pull(userId)
+    } else {
+      image.likes.push(userId)
     }
-    const s3Object = await s3.getObject(s3Params).promise()
-    const buffer = s3Object.Body
-    const resizedBuffer = await sharp(buffer)
-      .resize(Number(width), Number(height))
-      .toBuffer()
-    const uploadParams = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: `images/${image.filename}`,
-      Body: resizedBuffer,
-      ContentType: s3Object.ContentType
-    }
-    await s3.upload(uploadParams).promise()
-    image.width = Number(width)
-    image.height = Number(height)
+
     await image.save()
-    res.status(200).json({ message: 'image resized successfully', image })
+
+    return apiResponse(
+      res,
+      true,
+      alreadyLiked ? 'Like quitado' : 'Like agregado',
+      {
+        imageId: image._id,
+        likes: image.likes.length
+      }
+    )
   } catch (error) {
-    res.status(500).json({ error: error.message })
-  }
-}
-
-export const rotateImage = async (req, res) => {
-  try {
-    const image = await Image.findById({ _id: req.params.id, user: req.user._id })
-    if (!image) {
-      return res.status(404).json({ error: 'image not found' })
-    }
-    const s3Params = {
-      Bucket: process.env.AWS_BUCKET_NAME, // Reemplaza con el nombre de tu bucket
-      Key: `images/${image.filename}`
-    }
-    const { angle } = req.query
-    const s3Object = await s3.getObject(s3Params).promise()
-    const buffer = s3Object.Body
-    const rotatedBuffer = await sharp(buffer).rotate(Number(angle)).toBuffer()
-    const uploadParams = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: `images/${image.filename}`,
-      Body: rotatedBuffer,
-      ContentType: s3Object.ContentType
-    }
-    await s3.upload(uploadParams).promise()
-    res.status(200).json({ message: 'image rotated successfully', image })
-  } catch (error) {
-    res.status(500).json({ error: error.message })
-  }
-}
-
-export const flipImage = async (req, res) => {
-  try {
-    const image = await Image.findById({ _id: req.params.id, user: req.user._id })
-    if (!image) {
-      return res.status(404).json({ error: 'image not found' })
-    }
-    const { flip } = req.query
-    const s3Params = {
-      Bucket: process.env.AWS_BUCKET_NAME, // Reemplaza con el nombre de tu bucket
-      Key: `images/${image.filename}`
-    }
-    const s3Object = await s3.getObject(s3Params).promise()
-    const buffer = s3Object.Body
-    let flippedBuffer
-    if (flip === 'horizontal') {
-      flippedBuffer = await sharp(buffer).flip().toBuffer()
-    } else if (flip === 'vertical') {
-      flippedBuffer = await sharp(buffer).flop().toBuffer()
-    }
-    const uploadParams = {
-      Bucket: process.env.AWS_BUCKET_NAME, // Reemplaza con el nombre de tu bucket
-      Key: `images/${image.filename}`,
-      Body: flippedBuffer,
-      ContentType: s3Object.ContentType
-    }
-    await s3.upload(uploadParams).promise()
-    res.status(200).json({ message: 'image flipped successfully', image })
-  } catch (error) {
-    res.status(500).json({ error: error.message })
-  }
-}
-
-export const changeFormatImage = async (req, res) => {
-  try {
-    const image = await Image.findById({ _id: req.params.id, user: req.user._id })
-    if (!image) {
-      return res.status(404).json({ error: 'image not found' })
-    }
-
-    const newFormat = req.query.format
-    if (!newFormat) {
-      return res.status(400).json({ error: 'Format is required' })
-    }
-
-    const s3Params = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: `images/${image.filename}`
-    }
-    const s3Object = await s3.getObject(s3Params).promise()
-    const buffer = s3Object.Body
-    const newFilename = `${path.parse(image.filename).name}.${newFormat}`
-    const formattedBuffer = await sharp(buffer).toFormat(newFormat).toBuffer()
-    const uploadParams = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: `images/${newFilename}`,
-      Body: formattedBuffer,
-      ContentType: `image/${newFormat}`
-    }
-    await s3.upload(uploadParams).promise()
-    await s3.deleteObject(s3Params).promise()
-    image.format = newFormat
-    image.filename = newFilename
-    await image.save()
-    res.status(200).json({ message: 'image format changed successfully', image })
-  } catch (error) {
-    res.status(500).json({ error: error.message })
+    return apiResponse(
+      res,
+      false,
+      'Error al modificar el like',
+      null,
+      error.message,
+      500
+    )
   }
 }
