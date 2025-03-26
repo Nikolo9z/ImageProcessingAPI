@@ -1,6 +1,6 @@
 import express from 'express'
 import limiter from './middlewares/rateLimitMiddleware.js'
-import { connectDB } from './config.js'
+import { connectDB } from './bd/config.js'
 import imageRoutes from './routes/imageRoutes.js'
 import authRoutes from './routes/authRoutes.js'
 import swaggerUi from 'swagger-ui-express'
