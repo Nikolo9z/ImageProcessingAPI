@@ -235,3 +235,105 @@ export const toggleLike = async (req, res) => {
     )
   }
 }
+
+export const addComment = async (req, res) => {
+  try {
+    const imageId = req.params.id
+    const image = await Image.findById(imageId)
+    if (!image) {
+      return apiResponse(
+        res,
+        false,
+        'Imagen no encontrada',
+        null,
+        'ID inválido',
+        404
+      )
+    }
+    if (!req.body.text) {
+      return apiResponse(
+        res,
+        false,
+        'Comentario vacío',
+        null,
+        'Debes ingresar un comentario',
+        400
+      )
+    }
+    const comment = {
+      user: req.user._id,
+      username: req.user.username,
+      text: req.body.text
+    }
+
+    image.comments.push(comment)
+    await image.save()
+
+    return apiResponse(res, true, 'Comentario agregado', comment)
+  } catch (error) {
+    return apiResponse(
+      res,
+      false,
+      'Error al agregar comentario',
+      null,
+      error.message,
+      500
+    )
+  }
+}
+
+export const deleteComment = async (req, res) => {
+  try {
+    const imageId = req.params.id
+    const commentId = req.params.commentId
+
+    const image = await Image.findById(imageId)
+    if (!image) {
+      return apiResponse(
+        res,
+        false,
+        'Imagen no encontrada',
+        null,
+        'ID inválido',
+        404
+      )
+    }
+
+    const comment = image.comments.id(commentId)
+    if (!comment) {
+      return apiResponse(
+        res,
+        false,
+        'Comentario no encontrado',
+        null,
+        'ID inválido',
+        404
+      )
+    }
+
+    if (String(comment.user) !== String(req.user._id)) {
+      return apiResponse(
+        res,
+        false,
+        'No tienes permiso para eliminar este comentario',
+        null,
+        'Acceso denegado',
+        403
+      )
+    }
+
+    comment.deleteOne()
+    await image.save()
+
+    return apiResponse(res, true, 'Comentario eliminado correctamente')
+  } catch (error) {
+    return apiResponse(
+      res,
+      false,
+      'Error al eliminar comentario',
+      null,
+      error.message,
+      500
+    )
+  }
+}

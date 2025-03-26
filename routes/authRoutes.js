@@ -1,5 +1,7 @@
 import express from 'express'
-import { register, login } from '../controllers/authController.js'
+import { register, login, updateAvatar } from '../controllers/authController.js'
+import { protect } from '../middlewares/authMiddleware.js'
+import { upload } from '../controllers/imageController.js'
 
 const router = express.Router()
 
@@ -61,5 +63,6 @@ router.post('/register', register)
  *         description: Invalid email or password
  */
 router.post('/login', login)
+router.post('/updateAvatar', protect, upload.single('avatar'), updateAvatar)
 
 export default router

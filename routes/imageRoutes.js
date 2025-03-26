@@ -1,5 +1,14 @@
 import express from 'express'
-import { uploadImage, upload, getAllMyImages, getImageById, deleteImage, toggleLike } from '../controllers/imageController.js'
+import {
+  uploadImage,
+  upload,
+  getAllMyImages,
+  getImageById,
+  deleteImage,
+  toggleLike,
+  addComment,
+  deleteComment
+} from '../controllers/imageController.js'
 import { protect } from '../middlewares/authMiddleware.js'
 
 const router = express.Router()
@@ -110,5 +119,6 @@ router.get('/:id', protect, getImageById)
 router.delete('/:id', protect, deleteImage)
 
 router.post('/:id/like', protect, toggleLike)
-
+router.post('/:id/comments', protect, addComment)
+router.get('/:id/:commentId/comments', protect, deleteComment)
 export default router
