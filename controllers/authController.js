@@ -38,7 +38,7 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: 'Invalid password' })
     }
     const token = jwt.sign(
-      { id: user._id, username: user.username },
+      { id: user._id, username: user.username, urlAvatar: user.urlAvatar },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     )
@@ -51,62 +51,51 @@ export const login = async (req, res) => {
 export const updateAvatar = async (req, res) => {
   try {
     if (!req.user) {
-      return apiResponse(
-        res,
-        false,
-        'Usuario no autenticado',
-        null,
-        'Token inválido o expirado',
-        401
-      )
+      return apiResponse(res, false, 'Usuario no autenticado', null, 'Token inválido', 401)
     }
+
     const user = await User.findById(req.user._id)
     if (!user) {
-      return apiResponse(
-        res,
-        false,
-        'Usuario no encontrado',
-        null,
-        'Usuario no encontrado',
-        404
-      )
+      return apiResponse(res, false, 'Usuario no encontrado', null, 'Usuario no encontrado', 404)
     }
+
     if (!req.file) {
-      return apiResponse(
-        res,
-        false,
-        'No se ha proporcionado una imagen',
-        null,
-        'Imagen no encontrada',
-        400
-      )
+      return apiResponse(res, false, 'No se ha proporcionado una imagen', null, 'Imagen no encontrada', 400)
     }
+    if (user.urlAvatar) {
+      const oldKey = user.urlAvatar.split('.com/')[1]
+      await s3
+        .deleteObject({
+          Bucket: process.env.AWS_BUCKET_NAME,
+          Key: oldKey
+        })
+        .promise()
+    }
+
     const { buffer } = req.file
     const resizedBuffer = await sharp(buffer)
       .resize({ width: 250, height: 250 })
       .png()
       .toBuffer()
-    const filename = `${req.user._id}.png`
+
+    const timestamp = Date.now()
+    const filename = `${req.user._id}-${timestamp}.png`
+
     const s3params = {
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: `avatars/${filename}`,
       Body: resizedBuffer,
       ContentType: 'image/png'
     }
+
     const uploadResult = await s3.upload(s3params).promise()
-    console.log(uploadResult)
+
     await user.updateOne({ urlAvatar: uploadResult.Location })
+
     return apiResponse(res, true, 'Avatar actualizado exitosamente', {
       urlAvatar: uploadResult.Location
     })
   } catch (error) {
-    return apiResponse(
-      res,
-      false,
-      'Error al actualizar avatar',
-      null,
-      error.message,
-      500
-    )
+    return apiResponse(res, false, 'Error al actualizar avatar', null, error.message, 500)
   }
 }

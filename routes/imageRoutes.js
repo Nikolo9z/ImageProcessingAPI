@@ -7,7 +7,8 @@ import {
   deleteImage,
   toggleLike,
   addComment,
-  deleteComment
+  deleteComment,
+  getExploreImages
 } from '../controllers/imageController.js'
 import { protect } from '../middlewares/authMiddleware.js'
 
@@ -67,7 +68,7 @@ router.post('/upload', protect, upload.single('image'), uploadImage)
  *         description: Error retrieving images
  */
 router.get('/', protect, getAllMyImages)
-
+router.get('/explorer', getExploreImages)
 /**
  * @swagger
  * /api/images/{id}:
@@ -93,6 +94,7 @@ router.get('/', protect, getAllMyImages)
  *       404:
  *         description: Image not found
  */
+
 router.get('/:id', protect, getImageById)
 
 /**
@@ -120,5 +122,6 @@ router.delete('/:id', protect, deleteImage)
 
 router.post('/:id/like', protect, toggleLike)
 router.post('/:id/comments', protect, addComment)
-router.get('/:id/:commentId/comments', protect, deleteComment)
+router.delete('/:id/:commentId/comments', protect, deleteComment)
+
 export default router

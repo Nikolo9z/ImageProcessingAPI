@@ -317,7 +317,11 @@ export const deleteComment = async (req, res) => {
       )
     }
 
-    if (String(comment.user) !== String(req.user._id)) {
+    const userId = String(req.user._id)
+    const imageOwnerId = String(image.user)
+    const commentAuthorId = String(comment.user)
+
+    if (userId !== imageOwnerId && userId !== commentAuthorId) {
       return apiResponse(
         res,
         false,
@@ -337,6 +341,37 @@ export const deleteComment = async (req, res) => {
       res,
       false,
       'Error al eliminar comentario',
+      null,
+      error.message,
+      500
+    )
+  }
+}
+
+export const getExploreImages = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 20
+    const lastId = req.query.lastId
+
+    let query = {}
+    if (lastId) {
+      query = { _id: { $lt: lastId } }
+    }
+
+    const images = await Image.find(query)
+      .sort({ _id: -1 })
+      .limit(limit)
+      .select('-__v -user -comments -likes')
+
+    return apiResponse(res, true, 'Imágenes de explorar obtenidas', {
+      images,
+      lastId: images.length > 0 ? images[images.length - 1]._id : null
+    })
+  } catch (error) {
+    return apiResponse(
+      res,
+      false,
+      'Error al obtener imágenes de explorar',
       null,
       error.message,
       500
